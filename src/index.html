@@ -1,0 +1,809 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>P3 CPU Simulator</title>
+    <link rel="stylesheet" href="css/styles.css">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        /* Tab system */
+        .tabs {
+            display: flex;
+            border-bottom: 1px solid #ddd;
+            margin-bottom: 2px;
+            background: white;
+            border-radius: 8px 8px 0 0;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        .tab-btn {
+            color: black;
+            flex: 1;
+            padding: 15px 24px;
+            border: none;
+            background: #f8f8f8;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 500;
+            border-radius: 0;
+            transition: all 0.3s ease;
+            position: relative;
+            border-right: 1px solid #e0e0e0;
+        }
+        .tab-btn:last-child {
+            border-right: none;
+        }
+        .tab-btn.active {
+            background: #2196f3;
+            color: white;
+            box-shadow: inset 0 -2px 0 #1976d2;
+        }
+        .tab-btn:hover:not(.active) {
+            background: #e3f2fd;
+            color: #1565c0;
+        }
+        .tab-content {
+            display: none;
+            background: white;
+            border: 1px solid #ddd;
+            border-top: none;
+            border-radius: 0 0 8px 8px;
+            padding: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .tab-content.active {
+            display: block;
+        }
+
+        .section {
+            margin-bottom: 20px;
+        }
+        .section h2 {
+            margin-top: 0;
+            color: #333;
+            font-size: 18px;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 8px;
+        }
+        .controls {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-bottom: 15px;
+        }
+        button {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            background-color: #4CAF50;
+            color: white;
+            transition: background-color 0.2s;
+        }
+        button:hover:not(:disabled) {
+            background-color: #45a049;
+        }
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        .status {
+            padding: 8px;
+            border-radius: 4px;
+            font-weight: bold;
+        }
+        .status.success { background-color: #e8f5e8; color: #2e7d32; }
+        .status.error { background-color: #ffebee; color: #c62828; }
+        .status.info { background-color: #e3f2fd; color: #1565c0; }
+
+        /* Editor */
+        #editor {
+            width: 100%;
+            height: 400px;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            border: 1px solid #ccc;
+            padding: 10px;
+            border-radius: 4px;
+            resize: vertical;
+        }
+
+        /* Registers - compact layout */
+        .registers-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+        .register-item {
+            background: #f8f8f8;
+            padding: 8px;
+            border-radius: 4px;
+            text-align: center;
+            font-family: monospace;
+        }
+        .register-name {
+            font-weight: bold;
+            color: #333;
+            font-size: 12px;
+        }
+        .register-value {
+            font-size: 14px;
+            color: #1565c0;
+            margin: 4px 0;
+        }
+        .register-desc {
+            font-size: 10px;
+            color: #666;
+        }
+        .register-options {
+            margin-bottom: 15px;
+            padding: 8px;
+            background: #f8f8f8;
+            border-radius: 4px;
+        }
+        .register-options label {
+            font-size: 12px;
+            font-weight: bold;
+            color: #333;
+        }
+        .register-options select {
+            margin-left: 8px;
+            padding: 4px 8px;
+            border: 1px solid #ccc;
+            border-radius: 3px;
+            font-size: 12px;
+        }
+        .execution-speed {
+            margin-top: 10px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 12px;
+            color: #333;
+        }
+        .execution-speed input[type='range'] {
+            flex: 1;
+            min-width: 120px;
+        }
+        .execution-speed span {
+            min-width: 52px;
+            text-align: right;
+            font-family: monospace;
+        }
+
+        /* Memory viewer - hex editor style */
+        .memory-container {
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+        }
+        .memory-controls {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 15px;
+            align-items: center;
+        }
+        .memory-controls select, .memory-controls input {
+            padding: 4px 8px;
+            border: 1px solid #ccc;
+            border-radius: 3px;
+        }
+        .memory-hex {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+        .memory-row {
+            display: flex;
+            gap: 15px;
+            background: #f8f8f8;
+            padding: 4px 8px;
+            border-radius: 4px;
+            align-items: center;
+            flex-wrap: nowrap;
+        }
+        .memory-row:hover {
+            background: #e3f2fd;
+        }
+        .memory-addr {
+            font-family: monospace;
+            font-size: 12px;
+            text-align: right;
+            padding-right: 8px;
+            color: #666;
+            width: 80px;
+            flex-shrink: 0;
+        }
+        .memory-hex-col {
+            font-family: monospace;
+            font-size: 12px;
+            white-space: pre;
+            background: white;
+            padding: 2px 4px;
+            border-radius: 2px;
+            border: 1px solid #eee;
+            flex: 1;
+        }
+        .memory-ascii {
+            font-family: monospace;
+            font-size: 12px;
+            white-space: pre;
+            background: white;
+            padding: 2px 4px;
+            border-radius: 2px;
+            border: 1px solid #eee;
+            width: 120px;
+            flex-shrink: 0;
+        }
+
+        .memory-row:hover .memory-hex-byte {
+            background: #e3f2fd;
+        }
+
+        .memory-viewer-collection {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            margin-top: 16px;
+        }
+
+        .memory-static-viewer {
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            background: #ffffff;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+        }
+
+        .memory-static-viewer-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+            gap: 10px;
+            font-size: 12px;
+            color: #333;
+        }
+
+        .memory-static-viewer-controls {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin-bottom: 12px;
+            align-items: center;
+        }
+
+        .memory-static-control-label {
+            font-size: 12px;
+            color: #333;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .memory-static-control-label input,
+        .memory-static-control-label select {
+            padding: 4px 6px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-size: 12px;
+            min-width: 100px;
+        }
+
+        .memory-viewer-actions {
+            margin-top: 16px;
+            text-align: right;
+        }
+
+        .simulator-grid {
+            display: grid;
+            grid-template-columns: minmax(260px, 280px) minmax(300px, 340px) minmax(420px, 1fr);
+            gap: 20px;
+            align-items: start;
+            margin-top: 20px;
+        }
+
+        .simulator-column {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .simulator-panel {
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 16px;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+            height: 60vh;
+            max-height: 60vh;
+            overflow-y: auto;
+
+        }
+
+        .simulator-panel h2 {
+            margin-top: 0;
+        }
+
+        /* Program Viewer */
+        .program-viewer {
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            background: white;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+        }
+        .program-viewer-content {
+            padding: 0;
+        }
+        .instruction-row {
+            display: flex;
+            padding: 6px 12px;
+            border-bottom: 1px solid #eee;
+            align-items: center;
+            gap: 15px;
+            white-space: nowrap;
+            background: white;
+            cursor: pointer;
+            transition: background-color 0.1s;
+            width: fit-content;
+        }
+        .instruction-row:hover {
+            background: #f5f5f5;
+        }
+        .instruction-row.current-pc {
+            background: #c8e6c9;
+            font-weight: bold;
+            box-shadow: inset 2px 0 0 #4caf50;
+            padding-left: 10px;
+        }
+        .instruction-addr {
+            text-align: right;
+            width: 60px;
+            color: #666;
+            flex-shrink: 0;
+        }
+        .instruction-code {
+            flex: 1;
+            min-width: 200px;
+        }
+        .instruction-bytes {
+            color: #999;
+            font-size: 11px;
+            width: 60px;
+            text-align: right;
+            flex-shrink: 0;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 12px;
+        }
+        th, td {
+            padding: 8px;
+            border: 1px solid #ddd;
+            text-align: left;
+        }
+        th {
+            background-color: #f8f8f8;
+            font-weight: bold;
+        }
+        .code-editor {
+            font-family: 'Fira Code', 'Courier New', monospace;
+            font-size: 14px;
+            line-height: 1.5;
+            padding: 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            background: #2d3748;
+            color: #e2e8f0;
+            min-height: 400px;
+            white-space: pre;
+            overflow-wrap: normal;
+            overflow-x: auto;
+            tab-size: 4;
+        }
+        .code-editor:focus {
+            outline: none;
+            border-color: #2196f3;
+            box-shadow: 0 0 0 3px rgba(33, 150, 243, 0.1);
+        }
+
+        /* Basic syntax highlighting for comments */
+        .code-editor::selection {
+            background: rgba(33, 150, 243, 0.3);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <h1>P3 CPU Simulator</h1>
+        </header>
+
+        <!-- Tab Navigation -->
+        <div class="tabs">
+            <button class="tab-btn active" data-tab="program-tab">Program</button>
+            <button class="tab-btn" data-tab="simulator-tab">Simulator</button>
+        </div>
+
+        <!-- Program Tab -->
+        <div id="program-tab" class="tab-content active">
+            <div class="section">
+                <h2>Assembly Code Editor</h2>
+                <div contenteditable="true" id="editor" class="code-editor">;===============================================================================
+;===============================================================================
+; Programa Demo1.as
+;
+; Descricao: Demonstracao da utilizacao dos perifericos e interrupcoes no P3
+;            (1) Escrita de mensagem numa posição pre-definida da janela de
+;                texto.
+;            (2) Ciclo de escrita no display de 7 segmentos
+;            (3) Pausa/Recomeco da escrita por accao do interruptor da direita
+;            (4) Mudanca de display por activacao da interrupcao I0
+;            (5) Alteracao do estado dos LEDs em funcao do numero de interrup.
+;            (6) Escrita no LCD por activação da interrupção I1
+;
+; Autor: Nuno Horta
+; Data: 09/05/2003                              Ultima Alteracao:09/05/2006
+;===============================================================================
+
+;===============================================================================
+; ZONA I: Definicao de constantes
+;         Pseudo-instrucao : EQU
+;===============================================================================
+
+; TEMPORIZACAO
+DELAYVALUE      EQU     0100h
+
+; STACK POINTER
+SP_INICIAL      EQU     FDFFh
+
+; INTERRUPCOES
+TAB_INT0        EQU     FE00h
+TAB_INT1        EQU     FE01h
+MASCARA_INT     EQU     FFFAh
+
+; I/O a partir de FF00H
+DISP7S1         EQU     FFF0h
+DISP7S2         EQU     FFF1h
+LCD_WRITE       EQU     FFF5h
+LCD_CURSOR      EQU     FFF4h
+LEDS            EQU     FFF8h
+INTERRUPTORES   EQU     FFF9h
+IO_CURSOR       EQU     FFFCh
+IO_WRITE        EQU     FFFEh
+
+LIMPAR_JANELA   EQU     FFFFh
+XY_INICIAL      EQU     0614h
+FIM_TEXTO       EQU     '@'
+
+
+;===============================================================================
+; ZONA II: Definicao de variaveis
+;          Pseudo-instrucoes : WORD - palavra (16 bits)
+;                              STR  - sequencia de caracteres.
+;          Cada caracter ocupa 1 palavra
+;===============================================================================
+
+                ORIG    8000h
+VarTexto1       STR     '** LEEC 05/06 - 2º Semestre **',FIM_TEXTO
+
+
+
+;===============================================================================
+; ZONA III: Codigo
+;           conjunto de instrucoes Assembly, ordenadas de forma a realizar
+;           as funcoes pretendidas
+;===============================================================================
+
+
+                ORIG    0000h
+                JMP     inicio
+
+
+;===============================================================================
+; RotinaInt0: Rotina de interrupcao 0
+;               Entradas: R2, R3 - Portos dos Display de 7 Segmentos
+;                         R4 - Contador de interrupcoes
+;               Saidas:   R2, R3, R4
+;               Efeitos: (1) Comutacao de R2 e R3
+;                        (2) Incremento de R4
+;===============================================================================
+RotinaInt0:     XCH     R2, R3
+                INC     R4
+                MOV     M[LEDS], R4
+                RTI
+
+;===============================================================================
+; RotinaInt1: Rotina de interrupcao 1
+;               Entradas: R4, R1
+;               Saidas:   R4
+;               Efeitos: (1) Duplica R4
+;                        (2) Escreve '@' no LCD
+;===============================================================================
+
+RotinaInt1:     ROL     R4, 1
+                MOV     R6, 8018h
+                MOV     M[LCD_CURSOR], R6
+                MOV     R6, 0040h
+                MOV     M[LCD_WRITE], R6
+                RTI
+
+;===============================================================================
+; LimpaJanela: Rotina que limpa a janela de texto.
+;               Entradas: --
+;               Saidas: ---
+;               Efeitos: ---
+;===============================================================================
+
+LimpaJanela:    PUSH    R2
+                MOV     R2, LIMPAR_JANELA
+                MOV     M[IO_CURSOR], R2
+                POP     R2
+                RET
+
+;===============================================================================
+; EscString: Rotina que efectua a escrita de uma cadeia de caracter, terminada
+;            pelo caracter FIM_TEXTO, na janela de texto numa posicao
+;            especificada. Pode-se definir como terminador qualquer caracter
+;            ASCII.
+;               Entradas: pilha - posicao para escrita do primeiro carater
+;                         pilha - apontador para o inicio da "string"
+;               Saidas: ---
+;               Efeitos: ---
+;===============================================================================
+
+EscString:      PUSH    R1
+                PUSH    R2
+                PUSH    R3
+                MOV     R2, M[SP+6]   ; Apontador para inicio da "string"
+                MOV     R3, M[SP+5]   ; Localizacao do primeiro carater
+Ciclo:          MOV     M[IO_CURSOR], R3
+                MOV     R1, M[R2]
+                CMP     R1, FIM_TEXTO
+                BR.Z    FimEsc
+                CALL    EscCar
+                INC     R2
+                INC     R3
+                BR      Ciclo
+FimEsc:         POP     R3
+                POP     R2
+                POP     R1
+                RETN    2                ; Actualiza STACK
+
+;===============================================================================
+; EscCar: Rotina que efectua a escrita de um caracter para o ecran.
+;         O caracter pode ser visualizado na janela de texto.
+;               Entradas: R1 - Caracter a escrever
+;               Saidas: ---
+;               Efeitos: alteracao da posicao de memoria M[IO]
+;===============================================================================
+
+EscCar:         MOV     M[IO_WRITE], R1
+                RET
+
+;===============================================================================
+; EscDisplay: Rotina que efectua escrita no DISPLAY de 7 segmentos
+;               Entradas: R1 - Valor a enviar para o porto do DISPLAY
+;                         R2 - Porto do DISPLAY a utilizar
+;               Saidas: ---
+;               Efeitos: alteracao da posicao de memoria/porto M[R2]
+;===============================================================================
+
+EscDisplay:     MOV     M[R2], R1
+                RET
+
+;===============================================================================
+; Delay: Rotina que permite gerar um atraso
+;               Entradas: ---
+;               Saidas: ---
+;               Efeitos: ---
+;===============================================================================
+
+Delay:          PUSH    R1
+                MOV     R1, DELAYVALUE
+DelayLoop:      DEC     R1
+                BR.NZ   DelayLoop
+                POP     R1
+                RET
+
+;===============================================================================
+;                                Programa prinicipal
+;===============================================================================
+inicio:         MOV     R1, SP_INICIAL
+                MOV     SP, R1
+                MOV     R1, RotinaInt0
+                MOV     M[TAB_INT0], R1
+                MOV     R1, RotinaInt1
+                MOV     M[TAB_INT1], R1
+                MOV     R1,0003h
+                MOV     M[MASCARA_INT], R1
+                MOV     R2, DISP7S1
+                MOV     R3, DISP7S2
+                ENI
+                CALL    LimpaJanela
+                PUSH    VarTexto1           ; Passagem de parametros pelo STACK
+                PUSH    XY_INICIAL          ; Passagem de parametros pelo STACK
+                CALL    EscString
+ResetCont:      MOV     R1, 0001H
+CicloCont:      CALL    EscDisplay          ; Passagem de parametros por registo
+                CALL    Delay
+Stop:           MOV     R5, M[INTERRUPTORES]
+                TEST    R5, 0001H
+                BR.NZ   Stop
+                ROL     R1, 1
+                TEST    R1, 0010H
+                BR.Z    CicloCont
+                BR      ResetCont
+;===============================================================================
+
+</div>
+                <div class="controls" style="margin-top: 15px;">
+                    <button id="assemble-btn">Assemble & Load ROM</button>
+                </div>
+                <div id="program-status-display" class="status info">Ready to edit code</div>
+            </div>
+        </div>
+
+        <!-- Simulator Tab -->
+        <div id="simulator-tab" class="tab-content">
+            <div class="section">
+                <h2>Simulator Controls</h2>
+                <div class="controls">
+                        <button id="step-btn" disabled>⏭ Step</button>
+                        <button id="run-btn" disabled>▶ Run</button>
+                        <button id="reset-btn">↺ Reset CPU</button>
+                    </div>
+                    <div class="execution-speed">
+                        <label for="clock-speed">Clock speed:</label>
+                        <input type="range" id="clock-speed" min="1" max="100" value="40" step="any">
+                        <span id="clock-speed-display">~1 Hz</span>
+                    </div>
+                    <div id="status-display" class="status info">Ready to assemble code</div>
+                </div>
+
+            <div class="simulator-grid">
+                <div class="simulator-column">
+                    <div class="simulator-panel">
+                        <h2>CPU Registers</h2>
+                        <div class="register-options">
+                            <label>Display format: 
+                                <select id="register-format">
+                                    <option value="hex">Hexadecimal</option>
+                                    <option value="decimal">Decimal</option>
+                                    <option value="binary">Binary</option>
+                                    <option value="ascii">ASCII</option>
+                                </select>
+                            </label>
+                        </div>
+                        <div id="register-display">
+                            <div class="registers-grid">
+                                <div class="register-item">
+                                    <div class="register-name">R0</div>
+                                    <div class="register-value" id="reg-R0">0x0000</div>
+                                    <div class="register-desc">General</div>
+                                </div>
+                                <div class="register-item">
+                                    <div class="register-name">R1</div>
+                                    <div class="register-value" id="reg-R1">0x0000</div>
+                                    <div class="register-desc">General</div>
+                                </div>
+                                <div class="register-item">
+                                    <div class="register-name">R2</div>
+                                    <div class="register-value" id="reg-R2">0x0000</div>
+                                    <div class="register-desc">General</div>
+                                </div>
+                                <div class="register-item">
+                                    <div class="register-name">R3</div>
+                                    <div class="register-value" id="reg-R3">0x0000</div>
+                                    <div class="register-desc">General</div>
+                                </div>
+                                <div class="register-item">
+                                    <div class="register-name">R4</div>
+                                    <div class="register-value" id="reg-R4">0x0000</div>
+                                    <div class="register-desc">General</div>
+                                </div>
+                                <div class="register-item">
+                                    <div class="register-name">R5</div>
+                                    <div class="register-value" id="reg-R5">0x0000</div>
+                                    <div class="register-desc">General</div>
+                                </div>
+                                <div class="register-item">
+                                    <div class="register-name">R6</div>
+                                    <div class="register-value" id="reg-R6">0x0000</div>
+                                    <div class="register-desc">General</div>
+                                </div>
+                                <div class="register-item">
+                                    <div class="register-name">R7</div>
+                                    <div class="register-value" id="reg-R7">0x0000</div>
+                                    <div class="register-desc">General</div>
+                                </div>
+                                <div class="register-item">
+                                    <div class="register-name">PC</div>
+                                    <div class="register-value" id="reg-PC">0x0000</div>
+                                    <div class="register-desc">Program Counter</div>
+                                </div>
+                                <div class="register-item">
+                                    <div class="register-name">SP</div>
+                                    <div class="register-value" id="reg-SP">0x0000</div>
+                                    <div class="register-desc">Stack Pointer</div>
+                                </div>
+                                <div class="register-item">
+                                    <div class="register-name">RE</div>
+                                    <div class="register-value" id="reg-RE">0x0000</div>
+                                    <div class="register-desc">Return Address</div>
+                                </div>
+                            </div>
+                            <div class="flags-display">
+                                <strong>Flags:</strong> <span id="flags-display">Z=0 C=0 N=0 O=0 E=0</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="simulator-column">
+                    <div class="simulator-panel">
+                        <h2>Program Viewer (Disassembly)</h2>
+                        <div id="program-viewer" class="program-viewer">
+                            <div id="program-viewer-content" class="program-viewer-content">
+                                <!-- Disassembled instructions will be populated by JavaScript -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="simulator-column">
+                    <div class="simulator-panel">
+                        <h2>Memory Viewer</h2>
+                        <div id="memory-viewer" class="memory-container">
+                            <div class="memory-controls">
+                                <label>Offset: <input type="text" id="memory-offset" value="0x0000" size="6"></label>
+                                <label>Range: <select id="memory-range">
+                                    <option value="256">256 bytes (0x100)</option>
+                                    <option value="512" selected>512 bytes (0x200)</option>
+                                    <option value="1024">1KB (0x400)</option>
+                                </select></label>
+                                <label>View: <select id="memory-preset">
+                                    <option value="0x0000">Program Memory (0x0000)</option>
+                                    <option value="0x1000">Stack Area (0x1000)</option>
+                                    <option value="0xFF00">I/O Devices (0xFF00)</option>
+                                    <option value="custom">Custom Range</option>
+                                </select></label>
+                            </div>
+                            <div class="memory-hex" id="memory-hex-content">
+                                <!-- Memory rows will be populated by JavaScript -->
+                            </div>
+                            <div id="memory-viewer-collection" class="memory-viewer-collection">
+                                <!-- Additional memory viewers will appear here -->
+                            </div>
+                            <div class="memory-viewer-actions">
+                                <button id="add-memory-viewer">Add Viewer</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module" src="js/cpu-core/cpu.js"></script>
+    <script type="module" src="js/ui/ui.js"></script>
+    <script type="module" src="js/app.js"></script>
+</body>
+</html>
