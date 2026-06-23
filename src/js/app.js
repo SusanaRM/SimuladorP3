@@ -127,20 +127,20 @@ function getClockDelay() {
 
 function humanizeHz(hz) {
     if (hz === 0) return "0 Hz";
-    
+
     // Define the units
     const units = ["Hz", "kHz", "MHz", "GHz", "THz"];
-    
+
     // Calculate the magnitude (log10 helps determine the index)
     let i = Math.floor(Math.log10(hz) / 3);
-    
+
     // Calculate the value and round to 2 decimal places
     let value = (hz / Math.pow(10, i * 3)).toFixed(2);
     if (hz < 1) {
         value = hz.toFixed(2);
         i = 0;
     }
-    
+
     // Return formatted string, avoiding units out of range
     return `${value} ${units[i] || "Unknown"}`;
 }
@@ -193,34 +193,34 @@ function startExecution() {
     if (isRunning) return;
     stopExecution();
     const TICK_RATE_MS = 20;
-    
+
     // Reset trackers
     cycleCount = 0;
     lastTime = performance.now();
     let cycleAccumulator = 0;
     const targetHz = getClockSpeedHz();
-    
+
     const runBtn = document.getElementById('run-btn');
     if (runBtn) runBtn.textContent = '⏹ Stop';
-    
+
     isRunning = true;
-    
+
     runIntervalId = setInterval(() => {
         const frameStart = performance.now();
         // 1. Calculate how many fractional cycles belong in this 20ms tick
         // e.g., At 5 Hz, cyclesPerTick = 5 * 0.02 = 0.1 cycles per tick
         const cyclesPerTick = targetHz * (TICK_RATE_MS / 1000);
-        
+
         // 2. Accumulate the fractional value
         cycleAccumulator += cyclesPerTick;
-        
+
         // 3. Extract the integer number of cycles ready to run right now
         // e.g., floor(0.1) = 0. On the 10th tick, floor(1.0) = 1.
         let cyclesToRun = Math.floor(cycleAccumulator);
-        
+
         // 4. Keep the remainder fraction for the next tick
         cycleAccumulator -= cyclesToRun;
-        
+
         try {
             // Only run the loop if there is at least 1 cycle due
             if (cyclesToRun > 0) {
@@ -229,18 +229,18 @@ function startExecution() {
 
                     // @TODO: Breakpoints
                     // if (breakpoints.has(cpu.registers.PC)) { stopExecution(); break; }
-                    if (performance.now() - frameStart >= TICK_RATE_MS * 4/5) {
+                    if (performance.now() - frameStart >= TICK_RATE_MS * 4 / 5) {
                         // Max time reached.
-                        console.debug(`Could not keep up! Processed only ${i +1} of ${cyclesToRun} cycles.`)
-                        cyclesToRun = i+1;
+                        console.debug(`Could not keep up! Processed only ${i + 1} of ${cyclesToRun} cycles.`)
+                        cyclesToRun = i + 1;
                         break;
                     }
                 }
             }
-            
+
             // Pass cyclesToRun down so we can optimize UI rendering
             updateStats(cyclesToRun);
-            
+
         } catch (error) {
             stopExecution();
             updateStatus(`Execution halted: ${error.message}`, 'error');
@@ -260,18 +260,18 @@ function updateStatus(message, className) {
 function renderMemoryRange(container, startAddr, range) {
     container.innerHTML = '';
 
-    const bytesPerRow = 16;
-    const totalRows = Math.ceil(range / bytesPerRow);
+    const wordsPerRow = 8;
+    const totalRows = Math.ceil(range / wordsPerRow);
 
     for (let row = 0; row < totalRows; row++) {
-        const addr = startAddr + (row * bytesPerRow);
+        const addr = startAddr + (row * wordsPerRow);
 
         const rowDiv = document.createElement('div');
         rowDiv.className = 'memory-row';
 
         const addrDiv = document.createElement('div');
         addrDiv.className = 'memory-addr';
-        addrDiv.textContent = '0x' + addr.toString(16).toUpperCase().padStart(4, '0');
+        addrDiv.textContent = addr.toString(16).toLowerCase().padStart(4, '0') + ' : ';
         rowDiv.appendChild(addrDiv);
 
         const hexDiv = document.createElement('div');
@@ -279,22 +279,28 @@ function renderMemoryRange(container, startAddr, range) {
         let hexString = '';
         let asciiString = '';
 
-        for (let col = 0; col < bytesPerRow; col++) {
-            const byteAddr = addr + col;
-            if (byteAddr >= startAddr + range) break;
+        for (let col = 0; col < wordsPerRow; col++) {
+            const currentAddr = addr + col;
 
-            const wordAddr = Math.floor(byteAddr / 2);
-            const word = memory.read(wordAddr) || 0;
-            const value = (byteAddr % 2 === 0) ? ((word >> 8) & 0xFF) : (word & 0xFF);
+            if (currentAddr >= startAddr + range) break;
 
-            hexString += value.toString(16).toUpperCase().padStart(2, '0') + ' ';
-            const charCode = value & 0xFF;
-            const ascii = (charCode >= 32 && charCode <= 126) ? String.fromCharCode(charCode) : '.';
+            // Read directly the 16 bits word from memory
+            const word = memory.read(currentAddr) || 0;
+
+            // Directly formats word to hex representation (ex: c020)
+            hexString += word.toString(16).toLowerCase().padStart(4, '0') + ' ';
+
+            // Word to ASCII (16-bit / UTF-16)
+            const ascii = (word >= 32 && word <= 126) ? String.fromCharCode(word) : '.';
             asciiString += ascii;
         }
 
         hexDiv.textContent = hexString.trim();
         rowDiv.appendChild(hexDiv);
+
+        // Column spacing
+        const spacer = document.createTextNode('  ');
+        rowDiv.appendChild(spacer);
 
         const asciiDiv = document.createElement('div');
         asciiDiv.className = 'memory-ascii';
@@ -472,7 +478,7 @@ function setupEventListeners() {
     programStatusDisplay = document.getElementById('program-status-display');
     const clockSpeedInput = document.getElementById('clock-speed');
     clockSpeedInput.max = 3 * Math.log2(1000000000) + 2;
-    clockSpeedInput.value = 1/2 * clockSpeedInput.max;
+    clockSpeedInput.value = 1 / 2 * clockSpeedInput.max;
     setClockDisplay();
 
     const editor = document.getElementById('editor');
