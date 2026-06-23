@@ -106,7 +106,9 @@ export class CPU {
       C: !!(this.statusRegister & 0x04),
       N: !!(this.statusRegister & 0x02),
       O: !!(this.statusRegister & 0x01),
-      E: !!(this.statusRegister & 0x10)
+      E: !!(this.statusRegister & 0x10),
+      c: !!(this.statusRegister & 0x20),
+      z: !!(this.statusRegister & 0x40),
     };
   }
 

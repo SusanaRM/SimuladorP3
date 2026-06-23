@@ -31,7 +31,7 @@ function initApp() {
 }
 
 function updateRegisterDisplay() {
-    const registers = ['R0', 'R1', 'R2', 'R3', 'R4', 'R5', 'R6', 'R7', 'PC', 'SP'];
+    const registers = ['R0', 'R1', 'R2', 'R3', 'R4', 'R5', 'R6', 'R7', 'R8', 'R9', 'R10', 'R11', 'R12', 'R13', 'PC', 'SP'];
     const format = document.getElementById('register-format').value;
 
     registers.forEach((regName) => {
@@ -45,7 +45,7 @@ function updateRegisterDisplay() {
     // Update flags
     const flags = cpu.flags;
     document.getElementById('flags-display').textContent =
-        `Z=${flags.Z ? 1 : 0} C=${flags.C ? 1 : 0} N=${flags.N ? 1 : 0} O=${flags.O ? 1 : 0} E=${flags.E ? 1 : 0}`;
+        `Z=${flags.Z ? 1 : 0} C=${flags.C ? 1 : 0} N=${flags.N ? 1 : 0} O=${flags.O ? 1 : 0} E=${flags.E ? 1 : 0} z=${flags.z ? 1 : 0} c=${flags.c ? 1 : 0}`;
 }
 
 function updateProgramView({ highlightCurrent = true, scrollToCurrent = true } = {}) {

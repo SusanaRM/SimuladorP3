@@ -694,6 +694,20 @@ Stop:           MOV     R5, M[INTERRUPTORES]
                         </div>
                         <div id="register-display">
                             <div class="registers-grid">
+
+                                <div class="register-item">
+                                    <div class="register-name">PC</div>
+                                    <div class="register-value" id="reg-PC">0x0000</div>
+                                    <div class="register-desc">Program Counter</div>
+                                </div>
+                                <div class="register-item">
+                                    <div class="register-name">SP</div>
+                                    <div class="register-value" id="reg-SP">0x0000</div>
+                                    <div class="register-desc">Stack Pointer</div>
+                                </div>
+
+                                <br>
+
                                 <div class="register-item">
                                     <div class="register-name">R0</div>
                                     <div class="register-value" id="reg-R0">0x0000</div>
@@ -734,24 +748,41 @@ Stop:           MOV     R5, M[INTERRUPTORES]
                                     <div class="register-value" id="reg-R7">0x0000</div>
                                     <div class="register-desc">General</div>
                                 </div>
+
                                 <div class="register-item">
-                                    <div class="register-name">PC</div>
-                                    <div class="register-value" id="reg-PC">0x0000</div>
-                                    <div class="register-desc">Program Counter</div>
+                                    <div class="register-name">R8</div>
+                                    <div class="register-value" id="reg-R8">0x0000</div>
+                                    <div class="register-desc">General</div>
                                 </div>
                                 <div class="register-item">
-                                    <div class="register-name">SP</div>
-                                    <div class="register-value" id="reg-SP">0x0000</div>
-                                    <div class="register-desc">Stack Pointer</div>
+                                    <div class="register-name">R9</div>
+                                    <div class="register-value" id="reg-R9">0x0000</div>
+                                    <div class="register-desc">General</div>
                                 </div>
                                 <div class="register-item">
-                                    <div class="register-name">RE</div>
-                                    <div class="register-value" id="reg-RE">0x0000</div>
-                                    <div class="register-desc">Return Address</div>
+                                    <div class="register-name">R10</div>
+                                    <div class="register-value" id="reg-R10">0x0000</div>
+                                    <div class="register-desc">General</div>
                                 </div>
+                                <div class="register-item">
+                                    <div class="register-name">R11</div>
+                                    <div class="register-value" id="reg-R11">0x0000</div>
+                                    <div class="register-desc">General</div>
+                                </div>
+                                <div class="register-item">
+                                    <div class="register-name">R12</div>
+                                    <div class="register-value" id="reg-R12">0x0000</div>
+                                    <div class="register-desc">General</div>
+                                </div>
+                                <div class="register-item">
+                                    <div class="register-name">R13</div>
+                                    <div class="register-value" id="reg-R13">0x0000</div>
+                                    <div class="register-desc">General</div>
+                                </div>
+
                             </div>
                             <div class="flags-display">
-                                <strong>Flags:</strong> <span id="flags-display">Z=0 C=0 N=0 O=0 E=0</span>
+                                <strong>Flags:</strong> <span id="flags-display"></span>
                             </div>
                         </div>
                     </div>
