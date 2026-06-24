@@ -803,20 +803,7 @@ Stop:           MOV     R5, M[INTERRUPTORES]
                     <div class="simulator-panel">
                         <h2>Memory Viewer</h2>
                         <div id="memory-viewer" class="memory-container">
-                            <div class="memory-controls">
-                                <label>Offset: <input type="text" id="memory-offset" value="0x0000" size="6"></label>
-                                <label>Range: <select id="memory-range">
-                                    <option value="256">256 bytes (0x100)</option>
-                                    <option value="512" selected>512 bytes (0x200)</option>
-                                    <option value="1024">1KB (0x400)</option>
-                                </select></label>
-                                <label>View: <select id="memory-preset">
-                                    <option value="0x0000">Program Memory (0x0000)</option>
-                                    <option value="0x1000">Stack Area (0x1000)</option>
-                                    <option value="0xFF00">I/O Devices (0xFF00)</option>
-                                    <option value="custom">Custom Range</option>
-                                </select></label>
-                            </div>
+                            
                             <div class="memory-hex" id="memory-hex-content">
                                 <!-- Memory rows will be populated by JavaScript -->
                             </div>

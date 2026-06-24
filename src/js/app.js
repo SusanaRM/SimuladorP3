@@ -14,6 +14,8 @@ let isRunning = false;
 let statusDisplay = null;
 let programStatusDisplay = null;
 
+let activeMemoryViewers = []; // Track active memory viewers for updates
+
 function initApp() {
     // Initialize CPU, Assembler, and Disassembler
     cpu = new CPU(memory);
@@ -317,16 +319,12 @@ function resetCpuState() {
 }
 
 function updateMemoryDisplay() {
-    const container = document.getElementById('memory-hex-content');
-    const offsetInput = document.getElementById('memory-offset');
-    const rangeSelect = document.getElementById('memory-range');
-
-    let startAddr = parseInt(offsetInput.value, 16) || 0;
-    const range = parseInt(rangeSelect.value) || 512;
-    renderMemoryRange(container, startAddr, range);
+    activeMemoryViewers.forEach(({ viewerCard, render }) => {
+        render();
+    });
 }
 
-function createMemorySnapshotViewer(startAddr, range, title) {
+function createMemorySnapshotViewer(startAddr, range, allowRemove = true) {
     const collection = document.getElementById('memory-viewer-collection');
     if (!collection) return;
 
@@ -337,13 +335,12 @@ function createMemorySnapshotViewer(startAddr, range, title) {
     header.className = 'memory-static-viewer-header';
 
     const label = document.createElement('div');
-    label.textContent = title;
     header.appendChild(label);
 
     const removeBtn = document.createElement('button');
     removeBtn.type = 'button';
     removeBtn.textContent = 'Remove';
-    removeBtn.addEventListener('click', () => viewerCard.remove());
+    removeBtn.style.visibility = allowRemove ? 'visible' : 'hidden';
     header.appendChild(removeBtn);
 
     viewerCard.appendChild(header);
@@ -367,7 +364,7 @@ function createMemorySnapshotViewer(startAddr, range, title) {
     ['256', '512', '1024'].forEach((value) => {
         const option = document.createElement('option');
         option.value = value;
-        option.textContent = value === '256' ? '256 bytes (0x100)' : value === '512' ? '512 bytes (0x200)' : '1KB (0x400)';
+        option.textContent = value === '256' ? '256 words (0x100)' : value === '512' ? '512 words (0x200)' : '1KB (0x400)';
         if (parseInt(value, 10) === range) option.selected = true;
         rangeInput.appendChild(option);
     });
@@ -379,7 +376,8 @@ function createMemorySnapshotViewer(startAddr, range, title) {
     const presetSelect = document.createElement('select');
     const presets = [
         { value: '0x0000', text: 'Program Memory (0x0000)' },
-        { value: '0x1000', text: 'Stack Area (0x1000)' },
+        { value: '0x8000', text: 'RAM (0x8000)' },
+        { value: '0xFD00', text: 'Stack Area (0xFD00)' },
         { value: '0xFF00', text: 'I/O Devices (0xFF00)' },
         { value: 'custom', text: 'Custom Range' }
     ];
@@ -419,7 +417,7 @@ function createMemorySnapshotViewer(startAddr, range, title) {
         const currentStart = parseInt(offsetInput.value, 16) || 0;
         const currentRange = parseInt(rangeInput.value, 10) || 512;
         const presetName = presetSelect.options[presetSelect.selectedIndex]?.text || 'Custom';
-        label.textContent = `Memory viewer: Offset 0x${currentStart.toString(16).toUpperCase().padStart(4, '0')} | ${currentRange} bytes (${presetName})`;
+        label.textContent = `Memory viewer: Offset 0x${currentStart.toString(16).toUpperCase().padStart(4, '0')} | ${currentRange} words (${presetName})`;
         renderMemoryRange(viewerContent, currentStart, currentRange);
     };
 
@@ -435,6 +433,17 @@ function createMemorySnapshotViewer(startAddr, range, title) {
 
     render();
     collection.appendChild(viewerCard);
+
+    activeMemoryViewers.push({viewerCard, render});
+
+    removeBtn.addEventListener('click', () => {
+        viewerCard.remove();
+        // Remove the viewer from activeMemoryViewers
+        const index = activeMemoryViewers.findIndex(v => v.viewerCard === viewerCard);
+        if (index !== -1) {
+            activeMemoryViewers.splice(index, 1);
+        }
+    });
 }
 
 function setupEventListeners() {
@@ -489,22 +498,9 @@ function setupEventListeners() {
     const memoryPreset = document.getElementById('memory-preset');
     const addMemoryViewerBtn = document.getElementById('add-memory-viewer');
 
-    // Update memory display when controls change
-    memoryOffset.addEventListener('input', updateMemoryDisplay);
-    memoryRange.addEventListener('change', updateMemoryDisplay);
-    memoryPreset.addEventListener('change', () => {
-        if (memoryPreset.value !== 'custom') {
-            memoryOffset.value = memoryPreset.value;
-            updateMemoryDisplay();
-        }
-    });
-
+    createMemorySnapshotViewer(0, 256, false);
     addMemoryViewerBtn.addEventListener('click', () => {
-        const startAddr = parseInt(memoryOffset.value, 16) || 0;
-        const range = parseInt(memoryRange.value) || 512;
-        const presetText = memoryPreset.options[memoryPreset.selectedIndex].text;
-        const title = `Memory viewer: Offset 0x${startAddr.toString(16).toUpperCase().padStart(4, '0')} | ${range} bytes (${presetText})`;
-        createMemorySnapshotViewer(startAddr, range, title);
+        createMemorySnapshotViewer(0, 256);
     });
 
     // Register format selector
