@@ -185,6 +185,71 @@
             text-align: right;
             font-family: monospace;
         }
+        .simulator-control-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 20px;
+            flex-wrap: wrap;
+            margin-bottom: 12px;
+        }
+        .simulator-control-buttons {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            flex: 1 1 280px;
+            min-width: 240px;
+            align-self: flex-start;
+        }
+        .execution-stats {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            width: 220px;
+            min-width: 200px;
+            margin-top: 0;
+            align-self: flex-start;
+        }
+        .execution-stat {
+            background: #fafafa;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 8px 12px;
+        }
+        .execution-stat strong {
+            display: block;
+            font-size: 11px;
+            color: #666;
+            margin-bottom: 4px;
+        }
+        .highlight-change {
+            background-color: #fff2a8;
+        }
+        .register-value,
+        .memory-cell,
+        .flags-display span {
+            transition: background-color 1.2s ease;
+        }
+        .memory-cell {
+            display: inline-block;
+            font-family: monospace;
+            white-space: pre;
+            vertical-align: top;
+        }
+        .flags-display span {
+            display: inline-block;
+            margin-right: 8px;
+            padding: 0 2px;
+            font-family: monospace;
+        }
+        .memory-cell.memory-cell-hex {
+            min-width: 40px;
+            text-align: left;
+        }
+        .memory-cell.memory-cell-ascii {
+            min-width: 12px;
+            text-align: center;
+        }
 
         /* Memory viewer - hex editor style */
         .memory-container {
@@ -359,17 +424,35 @@
             white-space: nowrap;
             background: white;
             cursor: pointer;
-            transition: background-color 0.1s;
+            transition: background-color 0.1s, border-color 0.1s;
             width: fit-content;
         }
         .instruction-row:hover {
             background: #f5f5f5;
+        }
+        .instruction-row.breakpoint-active {
+            background: #fff3e0;
+            border-left: 4px solid #ff7043;
+        }
+        .instruction-row.current-pc.breakpoint-active {
+            background: #ffccbc;
         }
         .instruction-row.current-pc {
             background: #c8e6c9;
             font-weight: bold;
             box-shadow: inset 2px 0 0 #4caf50;
             padding-left: 10px;
+        }
+        .breakpoint-indicator {
+            width: 18px;
+            text-align: center;
+            color: #999;
+            font-size: 14px;
+            user-select: none;
+            flex-shrink: 0;
+        }
+        .instruction-row.breakpoint-active .breakpoint-indicator {
+            color: #d50000;
         }
         .instruction-addr {
             text-align: right;
@@ -664,19 +747,33 @@ Stop:           MOV     R5, M[INTERRUPTORES]
         <!-- Simulator Tab -->
         <div id="simulator-tab" class="tab-content">
             <div class="section">
-                <h2>Simulator Controls</h2>
-                <div class="controls">
-                        <button id="step-btn" disabled>⏭ Step</button>
-                        <button id="run-btn" disabled>▶ Run</button>
-                        <button id="reset-btn">↺ Reset CPU</button>
+                <div class="controls simulator-control-row">
+                    <div class="simulator-control-buttons">
+                        <!-- <h2>Simulator Controls</h2> -->
+                        <div class="controls">
+                            <button id="step-btn" disabled>⏭ Step</button>
+                            <button id="run-btn" disabled>▶ Run</button>
+                            <button id="reset-btn">↺ Reset CPU</button>
+                        </div>
+                        <div class="execution-speed">
+                            <label for="clock-speed">Clock speed:</label>
+                            <input type="range" id="clock-speed" min="1" max="100" value="40" step="any">
+                            <span id="clock-speed-display">~1 Hz</span>
+                        </div>
                     </div>
-                    <div class="execution-speed">
-                        <label for="clock-speed">Clock speed:</label>
-                        <input type="range" id="clock-speed" min="1" max="100" value="40" step="any">
-                        <span id="clock-speed-display">~1 Hz</span>
+                    <div class="execution-stats">
+                        <div class="execution-stat">
+                            <strong>Clock cycles</strong>
+                            <span id="clock-cycle-count">0</span>
+                        </div>
+                        <div class="execution-stat">
+                            <strong>Instructions executed</strong>
+                            <span id="instruction-count">0</span>
+                        </div>
                     </div>
-                    <div id="status-display" class="status info">Ready to assemble code</div>
                 </div>
+                <div id="status-display" class="status info">Ready to assemble code</div>
+            </div>
 
             <div class="simulator-grid">
                 <div class="simulator-column">
@@ -749,7 +846,7 @@ Stop:           MOV     R5, M[INTERRUPTORES]
                                     <div class="register-desc">General</div>
                                 </div>
 
-                                <div class="register-item">
+                                <!-- <div class="register-item">
                                     <div class="register-name">R8</div>
                                     <div class="register-value" id="reg-R8">0x0000</div>
                                     <div class="register-desc">General</div>
@@ -778,11 +875,18 @@ Stop:           MOV     R5, M[INTERRUPTORES]
                                     <div class="register-name">R13</div>
                                     <div class="register-value" id="reg-R13">0x0000</div>
                                     <div class="register-desc">General</div>
-                                </div>
+                                </div> -->
 
                             </div>
                             <div class="flags-display">
-                                <strong>Flags:</strong> <span id="flags-display"></span>
+                                <strong>Flags:</strong>
+                                <span class="flag-value" id="flag-Z">Z=0</span>
+                                <span class="flag-value" id="flag-C">C=0</span>
+                                <span class="flag-value" id="flag-N">N=0</span>
+                                <span class="flag-value" id="flag-O">O=0</span>
+                                <span class="flag-value" id="flag-E">E=0</span>
+                                <span class="flag-value" id="flag-z">z=0</span>
+                                <span class="flag-value" id="flag-c">c=0</span>
                             </div>
                         </div>
                     </div>
@@ -803,12 +907,8 @@ Stop:           MOV     R5, M[INTERRUPTORES]
                     <div class="simulator-panel">
                         <h2>Memory Viewer</h2>
                         <div id="memory-viewer" class="memory-container">
-                            
-                            <div class="memory-hex" id="memory-hex-content">
-                                <!-- Memory rows will be populated by JavaScript -->
-                            </div>
                             <div id="memory-viewer-collection" class="memory-viewer-collection">
-                                <!-- Additional memory viewers will appear here -->
+                                <!-- Memory viewer cards will be populated by JavaScript -->
                             </div>
                             <div class="memory-viewer-actions">
                                 <button id="add-memory-viewer">Add Viewer</button>

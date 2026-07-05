@@ -13,8 +13,13 @@ let runIntervalId = null;
 let isRunning = false;
 let statusDisplay = null;
 let programStatusDisplay = null;
+const breakpoints = new Set();
+let resumeBreakpointOnce = false;
 
 let activeMemoryViewers = []; // Track active memory viewers for updates
+const previousRegisterValues = new Map();
+const previousFlagValues = new Map();
+const HIGHLIGHT_DURATION_MS = 2000;
 
 function initApp() {
     // Initialize CPU, Assembler, and Disassembler
@@ -27,27 +32,43 @@ function initApp() {
     updateMemoryDisplay();
     updateProgramView();
     setClockDisplay();
+    updateExecutionCounters();
 
     // Set up event listeners
     setupEventListeners();
 }
 
 function updateRegisterDisplay() {
-    const registers = ['R0', 'R1', 'R2', 'R3', 'R4', 'R5', 'R6', 'R7', 'R8', 'R9', 'R10', 'R11', 'R12', 'R13', 'PC', 'SP'];
+    const registers = ['R0', 'R1', 'R2', 'R3', 'R4', 'R5', 'R6', 'R7', /*'R8', 'R9', 'R10', 'R11', 'R12', 'R13', */'PC', 'SP'];
     const format = document.getElementById('register-format').value;
 
     registers.forEach((regName) => {
         const element = document.getElementById(`reg-${regName}`);
         if (element) {
             const value = cpu.registers[regName];
-            element.textContent = formatRegisterValue(value, format);
+            const previousValue = previousRegisterValues.get(regName);
+            const displayValue = formatRegisterValue(value, format);
+
+            element.textContent = displayValue;
+            if (previousValue !== undefined && previousValue !== value) {
+                highlightChange(element);
+            }
+            previousRegisterValues.set(regName, value);
         }
     });
 
-    // Update flags
     const flags = cpu.flags;
-    document.getElementById('flags-display').textContent =
-        `Z=${flags.Z ? 1 : 0} C=${flags.C ? 1 : 0} N=${flags.N ? 1 : 0} O=${flags.O ? 1 : 0} E=${flags.E ? 1 : 0} z=${flags.z ? 1 : 0} c=${flags.c ? 1 : 0}`;
+    ['Z', 'C', 'N', 'O', 'E', 'z', 'c'].forEach((flagName) => {
+        const element = document.getElementById(`flag-${flagName}`);
+        if (!element) return;
+        const value = flags[flagName] ? 1 : 0;
+        const previousValue = previousFlagValues.get(flagName);
+        element.textContent = `${flagName}=${value}`;
+        if (previousValue !== undefined && previousValue !== value) {
+            highlightChange(element);
+        }
+        previousFlagValues.set(flagName, value);
+    });
 }
 
 function updateProgramView({ highlightCurrent = true, scrollToCurrent = true } = {}) {
@@ -74,15 +95,35 @@ function updateProgramView({ highlightCurrent = true, scrollToCurrent = true } =
         if (instruction.inst == '') return;
         const row = document.createElement('div');
         row.className = 'instruction-row';
+        row.dataset.addr = instruction.addr;
+        if (breakpoints.has(instruction.addr)) {
+            row.classList.add('breakpoint-active');
+        }
         if (highlightCurrent && instruction.addr <= currentPC) {
             currentInstructionRow = row;
         }
 
+        const breakpointMarker = breakpoints.has(instruction.addr) ? '●' : '○';
         row.innerHTML = `
+            <div class="breakpoint-indicator" title="Click to toggle breakpoint">${breakpointMarker}</div>
             <div class="instruction-addr">0x${instruction.addr.toString(16).toUpperCase().padStart(4, '0')}</div>
             <div class="instruction-code">${instruction.inst}</div>
             <div class="instruction-bytes">${'0x' + (instruction.value.toString(16).toUpperCase().padStart(4, '0'))}</div>
-            `;
+        `;
+
+        row.addEventListener('click', () => {
+            toggleBreakpoint(instruction.addr);
+            const marker = row.querySelector('.breakpoint-indicator');
+            if (breakpoints.has(instruction.addr)) {
+                row.classList.add('breakpoint-active');
+                marker.textContent = '●';
+                updateStatus(`Breakpoint set at 0x${instruction.addr.toString(16).toUpperCase().padStart(4, '0')}`, 'info');
+            } else {
+                row.classList.remove('breakpoint-active');
+                marker.textContent = '○';
+                updateStatus(`Breakpoint cleared at 0x${instruction.addr.toString(16).toUpperCase().padStart(4, '0')}`, 'info');
+            }
+        });
 
         viewer.appendChild(row);
     });
@@ -92,6 +133,14 @@ function updateProgramView({ highlightCurrent = true, scrollToCurrent = true } =
     const currentRow = viewer.querySelector('.instruction-row.current-pc');
     if (scrollToCurrent && currentRow) {
         currentRow.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    }
+}
+
+function toggleBreakpoint(address) {
+    if (breakpoints.has(address)) {
+        breakpoints.delete(address);
+    } else {
+        breakpoints.add(address);
     }
 }
 
@@ -152,12 +201,65 @@ function setClockDisplay() {
     document.getElementById('clock-speed-display').textContent = `${humanizeHz(hz)}`;
 }
 
+function updateExecutionCounters() {
+    const clockElement = document.getElementById('clock-cycle-count');
+    const instructionElement = document.getElementById('instruction-count');
+    if (clockElement) {
+        clockElement.textContent = cpu?.cycleCounter?.toString() ?? '0';
+    }
+    if (instructionElement) {
+        instructionElement.textContent = cpu?.executedInstructionCounter?.toString() ?? '0';
+    }
+}
+
+function highlightChange(element) {
+    element.classList.add('highlight-change');
+    if (element._highlightTimeoutId) {
+        clearTimeout(element._highlightTimeoutId);
+    }
+
+    if (!isRunning) {
+        delete element._highlightTimeoutId;
+        return;
+    }
+
+    element._highlightTimeoutId = setTimeout(() => {
+        element.classList.remove('highlight-change');
+        delete element._highlightTimeoutId;
+    }, HIGHLIGHT_DURATION_MS);
+}
+
+function pauseHighlightTimeouts() {
+    document.querySelectorAll('.highlight-change').forEach((element) => {
+        if (element._highlightTimeoutId) {
+            clearTimeout(element._highlightTimeoutId);
+            delete element._highlightTimeoutId;
+        }
+    });
+}
+
+function clearAllHighlights() {
+    document.querySelectorAll('.highlight-change').forEach((element) => {
+        element.classList.remove('highlight-change');
+        if (element._highlightTimeoutId) {
+            clearTimeout(element._highlightTimeoutId);
+            delete element._highlightTimeoutId;
+        }
+    });
+    activeMemoryViewers.forEach((viewer) => {
+        if (viewer.highlightExpiry) {
+            viewer.highlightExpiry.clear();
+        }
+    });
+}
+
 function stopExecution() {
     if (runIntervalId !== null) {
         clearInterval(runIntervalId);
         runIntervalId = null;
     }
     isRunning = false;
+    pauseHighlightTimeouts();
     const runBtn = document.getElementById('run-btn');
     if (runBtn) {
         runBtn.textContent = '▶ Run';
@@ -202,6 +304,7 @@ function startExecution() {
     let cycleAccumulator = 0;
     const targetHz = getClockSpeedHz();
 
+    clearAllHighlights();
     const runBtn = document.getElementById('run-btn');
     if (runBtn) runBtn.textContent = '⏹ Stop';
 
@@ -224,13 +327,31 @@ function startExecution() {
         cycleAccumulator -= cyclesToRun;
 
         try {
+            const currentPC = cpu.registers.PC;
+            if (breakpoints.has(currentPC) && !resumeBreakpointOnce) {
+                stopExecution();
+                updateStatus(`Breakpoint hit at 0x${currentPC.toString(16).toUpperCase().padStart(4, '0')}`, 'info');
+                updateProgramView();
+                updateExecutionCounters();
+                return;
+            }
+
+            if (resumeBreakpointOnce && cyclesToRun === 0) {
+                cyclesToRun = 1;
+            }
+            const shouldBypassBreakpoint = resumeBreakpointOnce;
+            resumeBreakpointOnce = false;
+
             // Only run the loop if there is at least 1 cycle due
             if (cyclesToRun > 0) {
                 for (let i = 0; i < cyclesToRun; i++) {
-                    cpu.executeSingleClockCycle();
+                    if (breakpoints.has(cpu.registers.PC) && !shouldBypassBreakpoint) {
+                        stopExecution();
+                        updateStatus(`Breakpoint hit at 0x${cpu.registers.PC.toString(16).toUpperCase().padStart(4, '0')}`, 'info');
+                        break;
+                    }
 
-                    // @TODO: Breakpoints
-                    // if (breakpoints.has(cpu.registers.PC)) { stopExecution(); break; }
+                    cpu.executeSingleClockCycle();
                     if (performance.now() - frameStart >= TICK_RATE_MS * 4 / 5) {
                         // Max time reached.
                         console.debug(`Could not keep up! Processed only ${i + 1} of ${cyclesToRun} cycles.`)
@@ -242,6 +363,7 @@ function startExecution() {
 
             // Pass cyclesToRun down so we can optimize UI rendering
             updateStats(cyclesToRun);
+            updateExecutionCounters();
 
         } catch (error) {
             stopExecution();
@@ -259,11 +381,12 @@ function updateStatus(message, className) {
     }
 }
 
-function renderMemoryRange(container, startAddr, range) {
+function renderMemoryRange(container, startAddr, range, previousValues = new Map(), highlightExpiry = new Map()) {
     container.innerHTML = '';
 
     const wordsPerRow = 8;
     const totalRows = Math.ceil(range / wordsPerRow);
+    const now = Date.now();
 
     for (let row = 0; row < totalRows; row++) {
         const addr = startAddr + (row * wordsPerRow);
@@ -278,37 +401,50 @@ function renderMemoryRange(container, startAddr, range) {
 
         const hexDiv = document.createElement('div');
         hexDiv.className = 'memory-hex-col';
-        let hexString = '';
-        let asciiString = '';
+        const asciiDiv = document.createElement('div');
+        asciiDiv.className = 'memory-ascii';
 
         for (let col = 0; col < wordsPerRow; col++) {
             const currentAddr = addr + col;
-
             if (currentAddr >= startAddr + range) break;
 
-            // Read directly the 16 bits word from memory
             const word = memory.read(currentAddr) || 0;
+            const hexText = word.toString(16).toLowerCase().padStart(4, '0');
+            const asciiText = (word >= 32 && word <= 126) ? String.fromCharCode(word) : '.';
+            const previousWord = previousValues.get(currentAddr);
+            const changed = previousWord !== undefined && previousWord !== word;
+            const expiry = highlightExpiry.get(currentAddr);
+            const keepHighlight = expiry === Infinity || (typeof expiry === 'number' && expiry > now);
 
-            // Directly formats word to hex representation (ex: c020)
-            hexString += word.toString(16).toLowerCase().padStart(4, '0') + ' ';
+            if (changed) {
+                highlightExpiry.set(currentAddr, isRunning ? now + HIGHLIGHT_DURATION_MS : Infinity);
+            }
 
-            // Word to ASCII (16-bit / UTF-16)
-            const ascii = (word >= 32 && word <= 126) ? String.fromCharCode(word) : '.';
-            asciiString += ascii;
+            const hexCell = document.createElement('span');
+            hexCell.className = 'memory-cell memory-cell-hex';
+            hexCell.textContent = `${hexText} `;
+            const asciiCell = document.createElement('span');
+            asciiCell.className = 'memory-cell memory-cell-ascii';
+            asciiCell.textContent = asciiText;
+
+            if (changed || keepHighlight) {
+                hexCell.classList.add('highlight-change');
+                asciiCell.classList.add('highlight-change');
+            }
+
+            if (!changed && !keepHighlight && highlightExpiry.has(currentAddr)) {
+                highlightExpiry.delete(currentAddr);
+            }
+
+            hexDiv.appendChild(hexCell);
+            asciiDiv.appendChild(asciiCell);
+            previousValues.set(currentAddr, word);
         }
 
-        hexDiv.textContent = hexString.trim();
         rowDiv.appendChild(hexDiv);
-
-        // Column spacing
         const spacer = document.createTextNode('  ');
         rowDiv.appendChild(spacer);
-
-        const asciiDiv = document.createElement('div');
-        asciiDiv.className = 'memory-ascii';
-        asciiDiv.textContent = asciiString;
         rowDiv.appendChild(asciiDiv);
-
         container.appendChild(rowDiv);
     }
 }
@@ -316,6 +452,7 @@ function renderMemoryRange(container, startAddr, range) {
 function resetCpuState() {
     stopExecution();
     cpu.reset();
+    previousRegisterValues.clear();
 }
 
 function updateMemoryDisplay() {
@@ -413,12 +550,14 @@ function createMemorySnapshotViewer(startAddr, range, allowRemove = true) {
         }
     };
 
+    const previousValues = new Map();
+    const highlightExpiry = new Map();
     const render = () => {
         const currentStart = parseInt(offsetInput.value, 16) || 0;
         const currentRange = parseInt(rangeInput.value, 10) || 512;
         const presetName = presetSelect.options[presetSelect.selectedIndex]?.text || 'Custom';
         label.textContent = `Memory viewer: Offset 0x${currentStart.toString(16).toUpperCase().padStart(4, '0')} | ${currentRange} words (${presetName})`;
-        renderMemoryRange(viewerContent, currentStart, currentRange);
+        renderMemoryRange(viewerContent, currentStart, currentRange, previousValues, highlightExpiry);
     };
 
     presetSelect.addEventListener('change', () => {
@@ -434,7 +573,7 @@ function createMemorySnapshotViewer(startAddr, range, allowRemove = true) {
     render();
     collection.appendChild(viewerCard);
 
-    activeMemoryViewers.push({viewerCard, render});
+    activeMemoryViewers.push({viewerCard, render, highlightExpiry});
 
     removeBtn.addEventListener('click', () => {
         viewerCard.remove();
@@ -529,6 +668,7 @@ function setupEventListeners() {
             updateRegisterDisplay();
             updateMemoryDisplay();
             updateProgramView();
+            updateExecutionCounters();
 
             // Keep buttons disabled until user switches to Simulator tab
             stepBtn.disabled = true;
@@ -547,11 +687,13 @@ function setupEventListeners() {
             stopExecution();
             updateStatus('Execution paused. Stepping one instruction.', 'info');
         }
+        clearAllHighlights();
         try {
             cpu.step();
             updateRegisterDisplay();
             updateMemoryDisplay();
             updateProgramView();
+            updateExecutionCounters();
             updateStatus(`Executed instruction at PC=0x${cpu.registers.PC.toString(16).toUpperCase().padStart(4, '0')}`, 'info');
         } catch (error) {
             updateStatus(`Execution error: ${error.message}`, 'error');
@@ -563,6 +705,10 @@ function setupEventListeners() {
             stopExecution();
             updateStatus('Execution stopped.', 'info');
             return;
+        }
+        const currentPC = cpu.registers.PC;
+        if (breakpoints.has(currentPC)) {
+            resumeBreakpointOnce = true;
         }
         startExecution();
     });
@@ -580,6 +726,7 @@ function setupEventListeners() {
         updateRegisterDisplay();
         updateMemoryDisplay();
         updateProgramView();
+        updateExecutionCounters();
         updateStatus('CPU state reset. ROM preserved.', 'info');
         stepBtn.disabled = false;
         runBtn.disabled = false;
