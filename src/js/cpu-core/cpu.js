@@ -24,12 +24,12 @@ export class CPU {
    */
   initializeProcessorState() {
     this.hardwareRegisters = new Array(16).fill(0);
-    this.instructionRegister = 0;          
-    this.statusRegister = 0;          
-    this.controlAddressRegister = 0;         
-    this.subroutineBranchRegister = 0;         
-    this.interruptSignalFlag = 0;         
-    this.interruptAcknowledgeFlag = 0;         
+    this.instructionRegister = 0;
+    this.statusRegister = 0;
+    this.controlAddressRegister = 0;
+    this.subroutineBranchRegister = 0;
+    this.interruptSignalFlag = 0;
+    this.interruptAcknowledgeFlag = 0;
     this.microcodeCache = null;
     this.decodedInstructionCache = null;
     this.cycleCounter = 0;
@@ -55,10 +55,7 @@ export class CPU {
     }
   }
 
-  /**
-   * Enumerable plain-object mapping supporting 16-to-32-bit sign-extended transformations,
-   * keeping downstream diagnostic suites, spreads, and JSON structural audits perfectly happy.
-   */
+
   get registers() {
     const registerProxyMap = {};
     
@@ -431,10 +428,6 @@ export class CPU {
     }
 
     return !!(currentMicrocode.f && currentMicrocode.li);
-  }
-
-  clock() {
-    return this.executeSingleClockCycle();
   }
 
   /**

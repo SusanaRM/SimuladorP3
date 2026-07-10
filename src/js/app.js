@@ -328,40 +328,43 @@ function startExecution() {
 
         try {
             const currentPC = cpu.registers.PC;
-            if (breakpoints.has(currentPC) && !resumeBreakpointOnce) {
-                stopExecution();
-                updateStatus(`Breakpoint hit at 0x${currentPC.toString(16).toUpperCase().padStart(4, '0')}`, 'info');
-                updateProgramView();
-                updateExecutionCounters();
-                return;
-            }
-
-            if (resumeBreakpointOnce && cyclesToRun === 0) {
-                cyclesToRun = 1;
-            }
+            
+            // Se o emulador for iniciado exatamente em cima de um breakpoint, tratamos o bypass
             const shouldBypassBreakpoint = resumeBreakpointOnce;
             resumeBreakpointOnce = false;
 
-            // Only run the loop if there is at least 1 cycle due
             if (cyclesToRun > 0) {
                 for (let i = 0; i < cyclesToRun; i++) {
-                    if (breakpoints.has(cpu.registers.PC) && !shouldBypassBreakpoint) {
-                        stopExecution();
-                        updateStatus(`Breakpoint hit at 0x${cpu.registers.PC.toString(16).toUpperCase().padStart(4, '0')}`, 'info');
-                        break;
+                    
+                    // Executa 1 ciclo de relógio e recolhe se a instrução Assembly terminou
+                    const isInstructionFinished = cpu.executeSingleClockCycle();
+
+                    // SÓ verificamos breakpoints quando a instrução Assembly terminar por completo
+                    if (isInstructionFinished) {
+                        const nextPC = cpu.registers.PC;
+                        
+                        if (breakpoints.has(nextPC)) {
+                            if (shouldBypassBreakpoint && nextPC === currentPC) {
+                                // Ignora o breakpoint se o utilizador acabou de carregar em "Continuar" no mesmo PC
+                                continue;
+                            }
+                            
+                            stopExecution();
+                            updateStatus(`Breakpoint hit at 0x${nextPC.toString(16).toUpperCase().padStart(4, '0')}`, 'info');
+                            break;
+                        }
                     }
 
-                    cpu.executeSingleClockCycle();
+                    // Mecanismo de segurança contra sobrecarga
                     if (performance.now() - frameStart >= TICK_RATE_MS * 4 / 5) {
-                        // Max time reached.
-                        console.debug(`Could not keep up! Processed only ${i + 1} of ${cyclesToRun} cycles.`)
+                        console.debug(`Could not keep up! Processed only ${i + 1} of ${cyclesToRun} cycles.`);
                         cyclesToRun = i + 1;
                         break;
                     }
                 }
             }
 
-            // Pass cyclesToRun down so we can optimize UI rendering
+            // Passa os ciclos executados para atualizar a interface
             updateStats(cyclesToRun);
             updateExecutionCounters();
 
